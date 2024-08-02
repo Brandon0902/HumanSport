@@ -25,7 +25,6 @@ var instructorsRouter = require('./routes/instructors');
 var coursesRouter = require('./routes/courses');
 var membershipRouter = require('./routes/memberships');
 var bookingsRouter = require('./routes/bookings');
-var comandosRouter  = require('./routes/comandosBD');
 
 var app = express();
 
@@ -57,7 +56,6 @@ app.use('/instructors', instructorsRouter);
 app.use('/courses', coursesRouter);
 app.use('/memberships', membershipRouter);
 app.use('/bookings', bookingsRouter);
-app.use('/comandos', comandosRouter);
 
 // Catch 404 and forward to error handler
 app.use(function(req, res, next) {
