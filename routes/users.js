@@ -14,6 +14,12 @@ let autentifica = require("../middleware/autentificajwt");
 
 const User = mongoose.model("User");
 
+function isAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
+  }
+  next();
+}
 
 
 // Validaciones para el cuerpo de la solicitud
@@ -193,35 +199,37 @@ router.post('/', upload.single('photo'), validations, async (req, res, next) => 
  */
 router.post("/login", [
   body("email").isEmail().withMessage("El usuario debe ser un email"),
-  body("password").isStrongPassword({minLength:5,
-                                     minLowercase:1,
-                                     minNumber:1,
-                                     minSymbols:1,
-                                     minUppercase:1       
-  }).withMessage("Se requiere minimo 8 caracteres 1 sea  miniscula, 1 mayuscula, un simbolo")
-], async (req,res)=>{
-  let error = validationResult(req);
-  if(!error.isEmpty()){
-    return res.status(400).send({errores: error.array()})
+  body("password").isStrongPassword({
+    minLength: 5,
+    minLowercase: 1,
+    minNumber: 1,
+    minSymbols: 1,
+    minUppercase: 1
+  }).withMessage("Se requiere mínimo 8 caracteres, 1 minúscula, 1 mayúscula y 1 símbolo")
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).send({ errores: errors.array() });
   }
 
-  let user = await User.findOne({email:req.body.email});
-
-  if(!user){
+  let user = await User.findOne({ email: req.body.email });
+  if (!user) {
     return res.status(400).send("Usuario o contraseña incorrectos");
   }
 
-  if(!await bcrypt.compare(req.body.password,user.password)){
+  const isMatch = await bcrypt.compare(req.body.password, user.password);
+  if (!isMatch) {
     return res.status(400).send("Usuario o contraseña incorrectos");
   }
 
-  let usuarioAutenticado={
-    message:"Bienvenido",
+  let usuarioAutenticado = {
+    message: "Bienvenido",
     email: user.email,
+    role: user.role,
     jwtoken: user.generateJWT()
   };
 
-  res.send({usuarioAutenticado});
+  res.send({ usuarioAutenticado });
 });
 
 /**
@@ -259,7 +267,7 @@ router.post("/login", [
  *       500:
  *         description: Error del servidor
  */
-router.put("/pass", autentifica, [
+router.put("/pass", autentifica, isAdmin, [
   body("email").isEmail(),
   body("password").isStrongPassword({minLength:5,
                                    minLowercase:1,
@@ -342,7 +350,7 @@ router.put("/pass", autentifica, [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/update/email', autentifica, [
+router.patch('/update/email', autentifica, isAdmin, [
   body("email").isEmail().withMessage("Debe ser un correo electrónico válido"),
   body("firstName").optional().isString().withMessage("Debe ser una cadena de texto"),
   body("lastName").optional().isString().withMessage("Debe ser una cadena de texto"),
@@ -417,7 +425,7 @@ router.patch('/update/email', autentifica, [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/delete/:email', autentifica, async (req, res, next) => {
+router.delete('/delete/:email', autentifica, isAdmin, async (req, res, next) => {
   try {
     let user = await User.findOne({ email: req.params.email });
     if (!user) {

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-
-const CourseSchema = new mongoose.Schema({
+const Schema = mongoose.Schema; 
+const CourseSchema = new Schema({
     name: {
         type: String,
         required: true,
@@ -16,11 +16,6 @@ const CourseSchema = new mongoose.Schema({
         required: true,
         min: 1
     },
-    instructorId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Instructor',
-        required: true
-    },
     status: {
         type: String,
         default: 'active',
@@ -32,18 +27,19 @@ const CourseSchema = new mongoose.Schema({
         default: Date.now
     },
     classDay: [
-        {   day: String,
+        {
+            day: String,
             time: String,
             startDate: String,
             endDate: String
         }
     ],
-    instructor:[
+    instructor: [
         {
-            name: String
+            type: Schema.Types.ObjectId,
+            ref: 'Instructor'
         }
-    ],
-
+    ]
 }, {
     timestamps: true
 });

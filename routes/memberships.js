@@ -1,9 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require("mongoose");
+const autentifica = require("../middleware/autentificajwt"); 
 
 const Membership = mongoose.model("Membership");
 const { check, validationResult } = require('express-validator');
+
+function isAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
+  }
+  next();
+}
 
 /**
  * @swagger
@@ -95,7 +103,7 @@ router.get('/', async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.post('/', [
+router.post('/', autentifica, isAdmin, [
     check('name').notEmpty().withMessage('El nombre de la membresía es requerido'),
     check('description').notEmpty().withMessage('La descripción de la membresía es requerida'),
     check('price').isNumeric().withMessage('El precio debe ser un número'),
@@ -175,7 +183,7 @@ router.post('/', [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/update/:id', [
+router.patch('/update/:id', autentifica, isAdmin, [
     check('name').optional().isString().withMessage('El nombre de la membresía debe ser una cadena'),
     check('description').optional().isString().withMessage('La descripción de la membresía debe ser una cadena'),
     check('price').optional().isNumeric().withMessage('El precio debe ser un número'),
@@ -231,7 +239,7 @@ router.patch('/update/:id', [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/delete/:id', async (req, res) => {
+router.delete('/delete/:id', autentifica, isAdmin, async (req, res) => {
     try {
       const membership = await Membership.findById(req.params.id);
       if (!membership) {
