@@ -10,7 +10,8 @@ const setupSwagger = require('./swagger');
 
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb+srv://bran0902:Br%40nd0n0902.@cluster0.nmhbwa5.mongodb.net/GymApp?retryWrites=true&w=majority');
+//mongoose.connect('mongodb+srv://bran0902:Br%40nd0n0902.@cluster0.nmhbwa5.mongodb.net/GymApp?retryWrites=true&w=majority');
+mongoose.connect('mongodb+srv://bre21:Brely9394@cluster.r1iyguf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster');
 
 // Listado de modelos
 require("./models/user");
@@ -25,7 +26,7 @@ var instructorsRouter = require('./routes/instructors');
 var coursesRouter = require('./routes/courses');
 var membershipRouter = require('./routes/memberships');
 var bookingsRouter = require('./routes/bookings');
-var comandosRouter  = require('./routes/comandosBD');
+//var comandosRouter  = require('./routes/comandosBD');
 
 var app = express();
 
@@ -57,7 +58,7 @@ app.use('/instructors', instructorsRouter);
 app.use('/courses', coursesRouter);
 app.use('/memberships', membershipRouter);
 app.use('/bookings', bookingsRouter);
-app.use('/comandos', comandosRouter);
+//app.use('/comandos', comandosRouter);
 
 // Catch 404 and forward to error handler
 app.use(function(req, res, next) {
