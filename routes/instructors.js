@@ -2,8 +2,16 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose'); 
 const { check, validationResult } = require('express-validator');
+const autentifica = require("../middleware/autentificajwt"); 
 
 const Instructor = mongoose.model('Instructor');
+
+function isAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
+  }
+  next();
+}
 
 /**
  * @swagger
@@ -30,7 +38,7 @@ const Instructor = mongoose.model('Instructor');
  *       500:
  *         description: Error del servidor
  */
-router.get('/', async (req, res) => {
+router.get('/', autentifica, isAdmin, async (req, res) => {
   try {
     const instructors = await Instructor.find({});
     res.json(instructors);
@@ -64,7 +72,7 @@ router.get('/', async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', autentifica, isAdmin, async (req, res) => {
   try {
     const instructor = await Instructor.findById(req.params.id);
     if (!instructor) {
@@ -111,7 +119,7 @@ router.get('/:id', async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.post('/', [
+router.post('/', autentifica, isAdmin,[
   check('name').notEmpty().withMessage('El nombre del instructor es requerido'),
   check('speciality').notEmpty().withMessage('La especialidad del instructor es requerida'),
   check('birthdate').isDate().withMessage('La fecha de nacimiento es requerida y debe ser válida')
@@ -176,7 +184,7 @@ router.post('/', [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/:id', [
+router.patch('/:id', autentifica, isAdmin,[
   check('name').optional().isString().withMessage('El nombre del instructor debe ser una cadena'),
   check('speciality').optional().isString().withMessage('La especialidad del instructor debe ser una cadena'),
   check('birthdate').optional().isDate().withMessage('La fecha de nacimiento debe ser válida')
@@ -223,7 +231,7 @@ router.patch('/:id', [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', autentifica, isAdmin, async (req, res) => {
   try {
     const deletedInstructor = await Instructor.findByIdAndDelete(req.params.id);
     if (!deletedInstructor) {

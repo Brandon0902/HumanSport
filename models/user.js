@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const instructor = require("./instructor");
 
 
 const UserSchema = new mongoose.Schema({

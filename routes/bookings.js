@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require("mongoose");
 const { check, validationResult } = require('express-validator');
+const autentifica = require("../middleware/autentificajwt")
 
 const Booking = mongoose.model("Booking");
+const Course = mongoose.model('Course');
+const User = mongoose.model('User');
 
 /**
  * @swagger
@@ -70,41 +73,71 @@ router.get('/', async (req, res) => {
  * @swagger
  * /bookings:
  *   post:
- *     summary: Crea una nueva reserva
+ *     summary: Crea una nueva reserva (booking)
  *     tags: [Booking]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Booking'
+ *             type: object
+ *             properties:
+ *               user:
+ *                 type: object
+ *                 properties:
+ *                   firstName:
+ *                     type: string
+ *                   phone:
+ *                     type: string
+ *               courseName:
+ *                 type: string
+ *                 description: El nombre del curso para la reserva
+ *               comments:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Reserva creada exitosamente
  *       400:
  *         description: Error de validación
+ *       404:
+ *         description: Curso o usuario no encontrado
  *       500:
  *         description: Error del servidor
  */
-router.post('/', [
-  check('user.*.firstName').notEmpty().withMessage('El nombre del usuario es requerido'),
-  check('user.*.phone').notEmpty().withMessage('El teléfono del usuario es requerido'),
-  check('course.*.name').notEmpty().withMessage('El nombre del curso es requerido'),
-  check('course.*.description').notEmpty().withMessage('La descripción del curso es requerida'),
+router.post('/', autentifica, [
+  check('user.firstName').notEmpty().withMessage('El nombre del usuario es requerido'),
+  check('user.phone').notEmpty().withMessage('El teléfono del usuario es requerido'),
+  check('courseName').notEmpty().withMessage('El nombre del curso es requerido'),
 ], async (req, res) => {
+
+  const { user, courseName, comments } = req.body;
+
+  try {
+    // Buscar el usuario por nombre y teléfono
+    const foundUser = await User.findOne({ firstName: user.firstName, phone: user.phone });
+    if (!foundUser) {
+      return res.status(404).json({ message: `Usuario con nombre ${user.firstName} y teléfono ${user.phone} no encontrado.` });
+    }
+
+    // Buscar el curso por nombre
+    const course = await Course.findOne({ name: courseName });
+    if (!course) {
+      return res.status(404).json({ message: `Curso con nombre ${courseName} no encontrado.` });
+    }
+
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const booking = new Booking({
-    user: req.body.user,
-    course: req.body.course,
-    status: req.body.status || 'active',
-    comments: req.body.comments || ''
-  });
+    // Crear el nuevo booking con las referencias al usuario y curso
+    const booking = new Booking({
+      user: foundUser._id,
+      course: course._id,
+      status: 'active',
+      comments: comments || ''
+    });
 
-  try {
     const savedBooking = await booking.save();
     res.status(201).json({ message: 'Reserva creada exitosamente', booking: savedBooking });
   } catch (err) {
@@ -142,10 +175,9 @@ router.post('/', [
  *         description: Error del servidor
  */
 router.patch('/actualizar/:id', [
-  check('user.*.firstName').optional().isString().withMessage('El nombre del usuario debe ser una cadena'),
-  check('user.*.phone').optional().isString().withMessage('El teléfono del usuario debe ser una cadena'),
-  check('course.*.name').optional().isString().withMessage('El nombre del curso debe ser una cadena'),
-  check('course.*.description').optional().isString().withMessage('La descripción del curso debe ser una cadena'),
+  check('user.firstName').optional().isString().withMessage('El nombre del usuario debe ser una cadena'),
+  check('user.phone').optional().isString().withMessage('El teléfono del usuario debe ser una cadena'),
+  check('courseName').optional().isString().withMessage('El nombre del curso debe ser una cadena'),
   check('status').optional().isIn(['active', 'deleted']).withMessage('El estado debe ser "active" o "deleted"'),
   check('comments').optional().isString().withMessage('Los comentarios deben ser una cadena'),
 ], async (req, res) => {
@@ -156,8 +188,26 @@ router.patch('/actualizar/:id', [
 
   try {
     const updateFields = {};
-    if (req.body.user) updateFields.user = req.body.user;
-    if (req.body.course) updateFields.course = req.body.course;
+
+    // Si se proporciona información del usuario, buscar el usuario y asignar el _id
+    if (req.body.user) {
+      const { firstName, phone } = req.body.user;
+      const foundUser = await User.findOne({ firstName, phone });
+      if (!foundUser) {
+        return res.status(404).json({ message: `Usuario con nombre ${firstName} y teléfono ${phone} no encontrado.` });
+      }
+      updateFields.user = foundUser._id;
+    }
+
+    // Si se proporciona el nombre del curso, buscar el curso y asignar el _id
+    if (req.body.courseName) {
+      const course = await Course.findOne({ name: req.body.courseName });
+      if (!course) {
+        return res.status(404).json({ message: `Curso con nombre ${req.body.courseName} no encontrado.` });
+      }
+      updateFields.course = course._id;
+    }
+
     if (req.body.status) updateFields.status = req.body.status;
     if (req.body.comments) updateFields.comments = req.body.comments;
 

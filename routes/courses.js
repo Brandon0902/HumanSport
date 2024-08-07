@@ -1,9 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require("mongoose");
+const autentifica = require("../middleware/autentificajwt");  
 
 const Course = mongoose.model("Course");
+const Instructor = mongoose.model('Instructor');
+const User = mongoose.model("User");
+
 const { check, validationResult } = require('express-validator');
+
 
 /**
  * @swagger
@@ -57,26 +62,58 @@ const { check, validationResult } = require('express-validator');
  * @swagger
  * /courses:
  *   get:
- *     summary: Obtiene todos los cursos
+ *     summary: Obtiene todos los cursos o solo los cursos asignados al instructor logueado
  *     tags: [Course]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lista de todos los cursos
+ *         description: Lista de cursos
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Course'
+ *       403:
+ *         description: Acceso denegado. No estás autorizado para ver los cursos.
+ *       404:
+ *         description: Usuario o instructor no encontrado.
+ *       500:
+ *         description: Error al obtener los cursos.
  */
-router.get('/', async (req, res) => {
+router.get('/', autentifica, async (req, res) => {
   try {
-    const courses = await Course.find({});
+    let courses;
+
+    // Instructores ven solo los cursos asignados a ellos
+    if (req.user.role === 'instructor') {
+      // Buscar el usuario logueado por email en la colección de usuarios
+      const user = await User.findOne({ email: req.user.email });
+      if (!user) {
+        return res.status(404).json({ message: 'Usuario no encontrado.' });
+      }
+
+      // Usar el nombre del usuario para buscar en la colección de instructores
+      const instructor = await Instructor.findOne({ name: user.firstName });
+      if (!instructor) {
+        return res.status(404).json({ message: 'Instructor no encontrado.' });
+      }
+
+      // Buscar cursos asignados al instructor encontrado
+      courses = await Course.find({ instructor: instructor._id });
+    } else {
+      // Administradores y usuarios ven todos los cursos
+      courses = await Course.find({});
+    }
+
     res.json(courses);
   } catch (err) {
     res.status(500).send('Error al obtener los cursos');
   }
 });
+
+
 
 /**
  * @swagger
@@ -98,14 +135,31 @@ router.get('/', async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.post('/', [
+router.post('/', autentifica, [
   check('name').notEmpty().withMessage('El nombre del curso es requerido'),
   check('description').notEmpty().withMessage('La descripción del curso es requerida'),
   check('capacity').isInt({ gt: 0 }).withMessage('La capacidad debe ser un número positivo'),
 ], async (req, res) => {
+  //console.log('Role:', req.user.role); 
+
+  // Verificar si el usuario es administrador
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
+  }
+
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
+  }
+
+  // Validar y convertir los IDs de instructores en ObjectIds
+  const instructorIds = [];
+  for (const instructorName of req.body.instructor) {
+    const instructor = await Instructor.findOne({ name: instructorName });
+    if (!instructor) {
+      return res.status(400).json({ message: `Instructor con nombre ${instructorName} no encontrado.` });
+    }
+    instructorIds.push(instructor._id);
   }
 
   const course = new Course({
@@ -119,9 +173,7 @@ router.post('/', [
       startDate: classDay.startDate,
       endDate: classDay.endDate
     })),
-    instructor: req.body.instructor.map(instructor => ({
-      name: instructor.name
-    }))
+    instructor: instructorIds
   });
 
   try {
@@ -131,6 +183,7 @@ router.post('/', [
     res.status(500).json({ message: 'Error al crear el curso', error: err.toString() });
   }
 });
+
 
 /**
  * @swagger
@@ -161,23 +214,16 @@ router.post('/', [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/actualizar/:id', [
-  check('name').optional().isString().withMessage('El nombre del curso debe ser una cadena'),
-  check('description').optional().isString().withMessage('La descripción del curso debe ser una cadena'),
-  check('capacity').optional().isInt({ gt: 0 }).withMessage('La capacidad debe ser un número positivo')
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+router.patch('/actualizar/:id', autentifica, async (req, res) => {
+  const courseId = req.params.id;
+
+  // Verificar si el usuario es administrador
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
   }
 
   try {
-    const updateFields = {};
-    if (req.body.name) updateFields.name = req.body.name;
-    if (req.body.description) updateFields.description = req.body.description;
-    if (req.body.capacity) updateFields.capacity = req.body.capacity;
-
-    const updatedCourse = await Course.findByIdAndUpdate(req.params.id, updateFields, { new: true, runValidators: true });
+    const updatedCourse = await Course.findByIdAndUpdate(courseId, req.body, { new: true, runValidators: true });
     if (!updatedCourse) {
       return res.status(404).json({ message: 'Curso no encontrado' });
     }
@@ -191,7 +237,7 @@ router.patch('/actualizar/:id', [
  * @swagger
  * /courses/eliminar/{id}:
  *   delete:
- *     summary: Elimina un curso
+ *     summary: Elimina un curso existente
  *     tags: [Course]
  *     parameters:
  *       - in: path
@@ -208,9 +254,16 @@ router.patch('/actualizar/:id', [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/eliminar/:id', async (req, res) => {
+router.delete('/eliminar/:id', autentifica, async (req, res) => {
+  const courseId = req.params.id;
+
+  // Verificar si el usuario es administrador
+  if (req.user.role !== 'admin') {
+    return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
+  }
+
   try {
-    const deletedCourse = await Course.findByIdAndDelete(req.params.id);
+    const deletedCourse = await Course.findByIdAndUpdate(courseId, { status: 'deleted' }, { new: true });
     if (!deletedCourse) {
       return res.status(404).json({ message: 'Curso no encontrado' });
     }
