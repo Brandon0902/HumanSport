@@ -12,6 +12,7 @@ const path = require('path');
 
 let autentifica = require("../middleware/autentificajwt");
 
+
 const User = mongoose.model("User");
 
 function isAdmin(req, res, next) {
@@ -20,6 +21,7 @@ function isAdmin(req, res, next) {
   }
   next();
 }
+
 
 
 // Validaciones para el cuerpo de la solicitud
@@ -37,7 +39,16 @@ const validations = [
   }),
   body("phone").isString().withMessage("Phone must be a string"),
   body("role").isString().withMessage("Role must be a string"),
-  body("password").isStrongPassword().withMessage("Invalid Password")
+  body("password")
+    .isStrongPassword({ 
+      //LA VALIDACIÓN DE LA PASSWORD VA AQUI
+      minLength: 5,
+      minLowercase: 1,
+      minNumber: 1,
+      minSymbols: 1,
+      minUppercase: 1,
+    })
+    .withMessage("Invalid Password"),
 ];
 
 /**
@@ -199,13 +210,7 @@ router.post('/', upload.single('photo'), validations, async (req, res, next) => 
  */
 router.post("/login", [
   body("email").isEmail().withMessage("El usuario debe ser un email"),
-  body("password").isStrongPassword({
-    minLength: 5,
-    minLowercase: 1,
-    minNumber: 1,
-    minSymbols: 1,
-    minUppercase: 1
-  }).withMessage("Se requiere mínimo 8 caracteres, 1 minúscula, 1 mayúscula y 1 símbolo")
+  body("password")
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -225,8 +230,8 @@ router.post("/login", [
   let usuarioAutenticado = {
     message: "Bienvenido",
     email: user.email,
-    role: user.role,
-    jwtoken: user.generateJWT()
+    jwtoken: user.generateJWT(),
+    ...user.toJSON() //Retorna los datos del usuario en el login
   };
 
   res.send({ usuarioAutenticado });
