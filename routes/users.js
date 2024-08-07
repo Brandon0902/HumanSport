@@ -85,6 +85,41 @@ router.get('/', autentifica, async(req, res, next)=> {
   }
 });
 
+// Obtener un usuario por ID
+router.get('/:id', autentifica, async (req, res, next) => {
+  try {
+    let user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).send('Usuario no encontrado');
+    }
+    res.send(user);
+  } catch (err) {
+    next(err);
+  }
+});
+
+//Edición del objeto entero PUT
+router.put('/:id', autentifica, async (req,res,next) =>{
+  try {
+    const { firstName, lastName, email, phone } = req.body;
+
+    // Actualizar el usuario en la base de datos
+    let user = await User.findByIdAndUpdate(
+      req.params.id,
+      { firstName, lastName, email, phone },
+      { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+    );
+
+    if (!user) {
+      return res.status(404).send('Usuario no encontrado');
+    }
+
+    res.send(user);
+  } catch (err) {
+    next(err);
+  }
+})
+
 /**
  * @swagger
  * /users:

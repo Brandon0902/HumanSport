@@ -22,7 +22,7 @@ UserSchema.methods.generateJWT = function() {
             role: this.role
         }, 
         process.env.JWT_SECRET,
-        { expiresIn: '1h' }
+        { expiresIn: '3h' }
     );
 };
 
