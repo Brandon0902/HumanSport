@@ -152,16 +152,6 @@ router.post('/', autentifica, [
     return res.status(400).json({ errors: errors.array() });
   }
 
-  // Validar y convertir los IDs de instructores en ObjectIds
-  const instructorIds = [];
-  for (const instructorName of req.body.instructor) {
-    const instructor = await Instructor.findOne({ name: instructorName });
-    if (!instructor) {
-      return res.status(400).json({ message: `Instructor con nombre ${instructorName} no encontrado.` });
-    }
-    instructorIds.push(instructor._id);
-  }
-
   const course = new Course({
     name: req.body.name,
     description: req.body.description,
@@ -173,7 +163,7 @@ router.post('/', autentifica, [
       startDate: classDay.startDate,
       endDate: classDay.endDate
     })),
-    instructor: instructorIds
+    instructor: req.body.instructor
   });
 
   try {

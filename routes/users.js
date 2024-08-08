@@ -78,7 +78,14 @@ const validations = [
  */
 router.get('/', autentifica, async(req, res, next)=> {
   try {
-    let users = await User.find({});
+    const role = req.query.role;
+    let query = {};
+
+    if (role) {
+      query.role = role;
+    }
+
+    let users = await User.find(query);
     res.send(users);
   } catch (err) {
     next(err);
