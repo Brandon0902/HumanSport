@@ -15,11 +15,23 @@ let autentifica = require("../middleware/autentificajwt");
 
 const User = mongoose.model("User");
 
-function isAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
+function canRegisterUser(req, res, next) {
+  const userRole = req.user.role;
+  const newUserRole = req.body.role;
+
+  if (userRole === 'admin') {
+    // Admin puede registrar cualquier tipo de usuario
+    return next();
+  } else if (userRole === 'recepcionista') {
+    // Recepcionista puede registrar cualquier usuario excepto 'admin' y 'recepcionista'
+    if (newUserRole === 'admin' || newUserRole === 'recepcionista') {
+      return res.status(403).send('Acceso denegado. No puedes registrar usuarios de tipo admin o recepcionista.');
+    }
+    return next();
+  } else {
+    // Otros roles no pueden registrar usuarios
     return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
   }
-  next();
 }
 
 
@@ -76,7 +88,7 @@ const validations = [
  *       500:
  *         description: Error del servidor
  */
-router.get('/', autentifica, async(req, res, next)=> {
+router.get('/', autentifica, canRegisterUser, async(req, res, next)=> {
   try {
     const role = req.query.role;
     let query = {};
@@ -93,7 +105,7 @@ router.get('/', autentifica, async(req, res, next)=> {
 });
 
 // Obtener un usuario por ID
-router.get('/:id', autentifica, async (req, res, next) => {
+router.get('/:id', autentifica, canRegisterUser, async (req, res, next) => {
   try {
     let user = await User.findById(req.params.id);
     if (!user) {
@@ -106,7 +118,7 @@ router.get('/:id', autentifica, async (req, res, next) => {
 });
 
 //Edición del objeto entero PUT
-router.put('/:id', autentifica, async (req,res,next) =>{
+router.put('/:id', autentifica, canRegisterUser, async (req,res,next) =>{
   try {
     const { firstName, lastName, email, phone } = req.body;
 
