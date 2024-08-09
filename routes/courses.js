@@ -143,7 +143,7 @@ router.post('/', autentifica, [
   //console.log('Role:', req.user.role); 
 
   // Verificar si el usuario es administrador
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
     return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
   }
 
@@ -208,7 +208,7 @@ router.patch('/actualizar/:id', autentifica, async (req, res) => {
   const courseId = req.params.id;
 
   // Verificar si el usuario es administrador
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
     return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
   }
 
@@ -248,7 +248,7 @@ router.delete('/eliminar/:id', autentifica, async (req, res) => {
   const courseId = req.params.id;
 
   // Verificar si el usuario es administrador
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
     return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
   }
 

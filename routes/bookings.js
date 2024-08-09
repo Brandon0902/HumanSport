@@ -60,7 +60,7 @@ const User = mongoose.model('User');
  *               items:
  *                 $ref: '#/components/schemas/Booking'
  */
-router.get('/', async (req, res) => {
+router.get('/',autentifica, async (req, res) => {
   try {
     const bookings = await Booking.find({});
     res.json(bookings);
@@ -174,7 +174,7 @@ router.post('/', autentifica, [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/actualizar/:id', [
+router.patch('/actualizar/:id',autentifica, [
   check('user.firstName').optional().isString().withMessage('El nombre del usuario debe ser una cadena'),
   check('user.phone').optional().isString().withMessage('El teléfono del usuario debe ser una cadena'),
   check('courseName').optional().isString().withMessage('El nombre del curso debe ser una cadena'),
@@ -242,7 +242,7 @@ router.patch('/actualizar/:id', [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/eliminar/:id', async (req, res) => {
+router.delete('/eliminar/:id',autentifica, async (req, res) => {
   try {
     const deletedBooking = await Booking.findByIdAndDelete(req.params.id);
     if (!deletedBooking) {

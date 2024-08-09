@@ -7,7 +7,7 @@ const autentifica = require("../middleware/autentificajwt");
 const Instructor = mongoose.model('Instructor');
 
 function isAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
     return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
   }
   next();
