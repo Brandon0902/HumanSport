@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require("mongoose");
 const autentifica = require("../middleware/autentificajwt"); 
-
 const Membership = mongoose.model("Membership");
+const User = mongoose.model("User"); 
 const { check, validationResult } = require('express-validator');
 
 function isAdmin(req, res, next) {
@@ -76,6 +76,9 @@ router.get('/', async (req, res) => {
  *                 type: string
  *                 enum: [active, inactive]
  *                 example: active
+ *               userName:
+ *                 type: string
+ *                 example: John Doe
  *               payment:
  *                 type: array
  *                 items:
@@ -108,29 +111,36 @@ router.post('/', autentifica, isAdmin, [
     check('description').notEmpty().withMessage('La descripción de la membresía es requerida'),
     check('price').isNumeric().withMessage('El precio debe ser un número'),
     check('durationDays').isInt({ gt: 0 }).withMessage('La duración en días debe ser un número positivo'),
-    check('status').isIn(['active', 'inactive']).withMessage('Estado inválido, debe ser activo o inactivo')
+    check('status').isIn(['active', 'inactive']).withMessage('Estado inválido, debe ser activo o inactivo'),
+    check('userName').notEmpty().withMessage('El nombre del usuario es requerido')
   ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const membership = new Membership({
-      name: req.body.name,
-      description: req.body.description,
-      price: req.body.price,
-      durationDays: req.body.durationDays,
-      status: req.body.status,
-      payment:req.body.payment.map(payment=>({
-        name:payment.name,
-        amount:payment.amount,
-        method:payment.method,
-        status:payment.status,
-        finished:payment.finished
-      }))
-    });
-
     try {
+      const user = await User.findOne({ name: req.body.userName });
+      if (!user) {
+        return res.status(400).json({ message: 'Usuario no encontrado' });
+      }
+
+      const membership = new Membership({
+        name: req.body.name,
+        description: req.body.description,
+        price: req.body.price,
+        durationDays: req.body.durationDays,
+        status: req.body.status,
+        userId: user._id, // Asignar el ID del usuario
+        payment: req.body.payment.map(payment => ({
+          name: payment.name,
+          amount: payment.amount,
+          method: payment.method,
+          status: payment.status,
+          finished: payment.finished
+        }))
+      });
+
       const savedMembership = await membership.save();
       res.status(201).json({ message: 'Membresía creada exitosamente', membership: savedMembership });
     } catch (err) {
