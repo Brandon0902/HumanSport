@@ -24,7 +24,7 @@ const membershipSchema = new mongoose.Schema({
     default: 'active',
     enum: ['active', 'inactive']
   },
-  payment: [
+  /*payment: [
     {
       name: String,
       amount: Number,
@@ -37,7 +37,7 @@ const membershipSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
-  }
+  }*/
 }, {
   timestamps: true
 });

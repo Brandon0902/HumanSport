@@ -104,7 +104,7 @@ router.get('/', autentifica, async (req, res) => {
       courses = await Course.find({ instructor: instructor._id });
     } else {
       // Administradores y usuarios ven todos los cursos
-      courses = await Course.find({});
+      courses = await Course.find({}).populate('instructor');
     }
 
     res.json(courses);
@@ -244,7 +244,7 @@ router.patch('/actualizar/:id', autentifica, async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.delete('/eliminar/:id', autentifica, async (req, res) => {
+router.delete('/delete/:id', autentifica, async (req, res) => {
   const courseId = req.params.id;
 
   // Verificar si el usuario es administrador
@@ -253,7 +253,7 @@ router.delete('/eliminar/:id', autentifica, async (req, res) => {
   }
 
   try {
-    const deletedCourse = await Course.findByIdAndUpdate(courseId, { status: 'deleted' }, { new: true });
+    const deletedCourse = await Course.findByIdAndUpdate(courseId, { status: 'inactive' }, { new: true });
     if (!deletedCourse) {
       return res.status(404).json({ message: 'Curso no encontrado' });
     }
@@ -262,5 +262,41 @@ router.delete('/eliminar/:id', autentifica, async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar el curso', error: err.toString() });
   }
 });
+
+// Obtener un curso por ID
+router.get('/:id', autentifica, async (req, res, next) => {
+  try {
+    let course = await Course.findById(req.params.id);
+    if (!course) {
+      return res.status(404).send('Curso no encontrado');
+    }
+    res.send(course);
+  } catch (err) {
+    next(err);
+  }
+});
+
+//Edición del objeto entero PUT
+router.put('/:id', autentifica, async (req,res,next) =>{
+  try {
+    const { name, description, capacity} = req.body;
+
+    // Actualizar el curso en la base de datos
+    let course = await Course.findByIdAndUpdate(
+      req.params.id,
+      { name, description, capacity },
+      { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+    );
+
+    if (!course) {
+      return res.status(404).send('Curso no encontrado');
+    }
+
+    res.send(course);
+  } catch (err) {
+    next(err);
+  }
+})
+
 
 module.exports = router;
