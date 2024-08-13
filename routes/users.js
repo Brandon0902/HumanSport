@@ -15,6 +15,13 @@ let autentifica = require("../middleware/autentificajwt");
 
 const User = mongoose.model("User");
 
+function isAdmin(req, res, next) {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
+    return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
+  }
+  next();
+}
+
 function canRegisterUser(req, res, next) {
   const userRole = req.user.role;
   const newUserRole = req.body.role;
@@ -484,15 +491,15 @@ router.patch('/update/email', autentifica, isAdmin, [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/delete/:email', autentifica, isAdmin, async (req, res, next) => {
+router.delete('/delete/:id', autentifica, isAdmin, async (req, res, next) => {
   try {
-    let user = await User.findOne({ email: req.params.email });
-    if (!user) {
-      return res.status(400).send("User not found");
-    }
+    let user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status: 'inactive',  },
+      { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+    );
 
-    let deletedUser = await User.findOneAndDelete({ email: req.params.email });
-    res.send({ deletedUser });
+    res.send({ user });
   } catch (err) {
     next(err);
   }
