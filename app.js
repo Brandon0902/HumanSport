@@ -11,7 +11,8 @@ const setupSwagger = require('./swagger');
 const mongoose = require('mongoose');
 
 //mongoose.connect('mongodb+srv://bran0902:Br%40nd0n0902.@cluster0.nmhbwa5.mongodb.net/GymApp?retryWrites=true&w=majority');
-mongoose.connect('mongodb+srv://bre21:Brely9394@cluster.r1iyguf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster');
+//mongoose.connect('mongodb+srv://bre21:Brely9394@cluster.r1iyguf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster');
+mongoose.connect('mongodb+srv://oswoldobd:oswoldo@cluster0.fqvvsqc.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
 
 // Listado de modelos
 require("./models/user");
