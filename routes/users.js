@@ -297,7 +297,7 @@ router.post("/login", [
 
   res.send({ usuarioAutenticado });
 });
-
+/*esta es una prueba*/
 /**
  * @swagger
  * /users/pass:
