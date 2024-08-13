@@ -111,8 +111,6 @@ router.post('/', autentifica, isAdmin, [
     check('description').notEmpty().withMessage('La descripción de la membresía es requerida'),
     check('price').isNumeric().withMessage('El precio debe ser un número'),
     check('durationDays').isInt({ gt: 0 }).withMessage('La duración en días debe ser un número positivo'),
-    check('status').isIn(['active', 'inactive']).withMessage('Estado inválido, debe ser activo o inactivo'),
-    check('userName').notEmpty().withMessage('El nombre del usuario es requerido')
   ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -120,25 +118,13 @@ router.post('/', autentifica, isAdmin, [
     }
 
     try {
-      const user = await User.findOne({ name: req.body.userName });
-      if (!user) {
-        return res.status(400).json({ message: 'Usuario no encontrado' });
-      }
-
+      
       const membership = new Membership({
         name: req.body.name,
         description: req.body.description,
         price: req.body.price,
         durationDays: req.body.durationDays,
-        status: req.body.status,
-        userId: user._id, // Asignar el ID del usuario
-        payment: req.body.payment.map(payment => ({
-          name: payment.name,
-          amount: payment.amount,
-          method: payment.method,
-          status: payment.status,
-          finished: payment.finished
-        }))
+        status: 'active'
       });
 
       const savedMembership = await membership.save();
@@ -263,5 +249,41 @@ router.delete('/delete/:id', autentifica, isAdmin, async (req, res) => {
       res.status(500).json({ message: 'Error al desactivar la membresía', error: err.toString() });
     }
   });
+
+  
+  // Obtener membresía por ID
+  router.get('/:id', autentifica, async (req, res, next) => {
+    try {
+      let membership = await Membership.findById(req.params.id);
+      if (!membership) {
+        return res.status(404).send('Membresía no encontrado');
+      }
+      res.send(membership);
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  //Edición del objeto entero PUT
+  router.put('/:id', autentifica, async (req,res,next) =>{
+    try {
+      const { name, description, price, durationDays} = req.body;
+  
+      // Actualizar el curso en la base de datos
+      let membership = await Membership.findByIdAndUpdate(
+        req.params.id,
+        { name, description, price, durationDays },
+        { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+      );
+  
+      if (!membership) {
+        return res.status(404).send('Membresía no encontrada');
+      }
+  
+      res.send(membership);
+    } catch (err) {
+      next(err);
+    }
+  })
 
 module.exports = router;
