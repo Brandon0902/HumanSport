@@ -2,12 +2,12 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require("mongoose");
 const autentifica = require("../middleware/autentificajwt"); 
-
 const Membership = mongoose.model("Membership");
+const User = mongoose.model("User"); 
 const { check, validationResult } = require('express-validator');
 
 function isAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
     return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
   }
   next();
@@ -76,6 +76,9 @@ router.get('/', async (req, res) => {
  *                 type: string
  *                 enum: [active, inactive]
  *                 example: active
+ *               userName:
+ *                 type: string
+ *                 example: John Doe
  *               payment:
  *                 type: array
  *                 items:
@@ -108,29 +111,22 @@ router.post('/', autentifica, isAdmin, [
     check('description').notEmpty().withMessage('La descripción de la membresía es requerida'),
     check('price').isNumeric().withMessage('El precio debe ser un número'),
     check('durationDays').isInt({ gt: 0 }).withMessage('La duración en días debe ser un número positivo'),
-    check('status').isIn(['active', 'inactive']).withMessage('Estado inválido, debe ser activo o inactivo')
   ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const membership = new Membership({
-      name: req.body.name,
-      description: req.body.description,
-      price: req.body.price,
-      durationDays: req.body.durationDays,
-      status: req.body.status,
-      payment:req.body.payment.map(payment=>({
-        name:payment.name,
-        amount:payment.amount,
-        method:payment.method,
-        status:payment.status,
-        finished:payment.finished
-      }))
-    });
-
     try {
+      
+      const membership = new Membership({
+        name: req.body.name,
+        description: req.body.description,
+        price: req.body.price,
+        durationDays: req.body.durationDays,
+        status: 'active'
+      });
+
       const savedMembership = await membership.save();
       res.status(201).json({ message: 'Membresía creada exitosamente', membership: savedMembership });
     } catch (err) {
@@ -253,5 +249,41 @@ router.delete('/delete/:id', autentifica, isAdmin, async (req, res) => {
       res.status(500).json({ message: 'Error al desactivar la membresía', error: err.toString() });
     }
   });
+
+  
+  // Obtener membresía por ID
+  router.get('/:id', autentifica, async (req, res, next) => {
+    try {
+      let membership = await Membership.findById(req.params.id);
+      if (!membership) {
+        return res.status(404).send('Membresía no encontrado');
+      }
+      res.send(membership);
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  //Edición del objeto entero PUT
+  router.put('/:id', autentifica, async (req,res,next) =>{
+    try {
+      const { name, description, price, durationDays} = req.body;
+  
+      // Actualizar el curso en la base de datos
+      let membership = await Membership.findByIdAndUpdate(
+        req.params.id,
+        { name, description, price, durationDays },
+        { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+      );
+  
+      if (!membership) {
+        return res.status(404).send('Membresía no encontrada');
+      }
+  
+      res.send(membership);
+    } catch (err) {
+      next(err);
+    }
+  })
 
 module.exports = router;

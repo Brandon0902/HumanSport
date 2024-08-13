@@ -16,10 +16,29 @@ let autentifica = require("../middleware/autentificajwt");
 const User = mongoose.model("User");
 
 function isAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
     return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
   }
   next();
+}
+
+function canRegisterUser(req, res, next) {
+  const userRole = req.user.role;
+  const newUserRole = req.body.role;
+
+  if (userRole === 'admin') {
+    // Admin puede registrar cualquier tipo de usuario
+    return next();
+  } else if (userRole === 'recepcionista') {
+    // Recepcionista puede registrar cualquier usuario excepto 'admin' y 'recepcionista'
+    if (newUserRole === 'admin' || newUserRole === 'recepcionista') {
+      return res.status(403).send('Acceso denegado. No puedes registrar usuarios de tipo admin o recepcionista.');
+    }
+    return next();
+  } else {
+    // Otros roles no pueden registrar usuarios
+    return res.status(403).send('Acceso denegado. No tienes permiso para esta acción.');
+  }
 }
 
 
@@ -76,7 +95,7 @@ const validations = [
  *       500:
  *         description: Error del servidor
  */
-router.get('/', autentifica, async(req, res, next)=> {
+router.get('/', autentifica, canRegisterUser, async(req, res, next)=> {
   try {
     const role = req.query.role;
     let query = {};
@@ -93,7 +112,7 @@ router.get('/', autentifica, async(req, res, next)=> {
 });
 
 // Obtener un usuario por ID
-router.get('/:id', autentifica, async (req, res, next) => {
+router.get('/:id', autentifica, canRegisterUser, async (req, res, next) => {
   try {
     let user = await User.findById(req.params.id);
     if (!user) {
@@ -106,7 +125,7 @@ router.get('/:id', autentifica, async (req, res, next) => {
 });
 
 //Edición del objeto entero PUT
-router.put('/:id', autentifica, async (req,res,next) =>{
+router.put('/:id', autentifica, canRegisterUser, async (req,res,next) =>{
   try {
     const { firstName, lastName, email, phone } = req.body;
 
@@ -472,15 +491,15 @@ router.patch('/update/email', autentifica, isAdmin, [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/delete/:email', autentifica, isAdmin, async (req, res, next) => {
+router.delete('/delete/:id', autentifica, isAdmin, async (req, res, next) => {
   try {
-    let user = await User.findOne({ email: req.params.email });
-    if (!user) {
-      return res.status(400).send("User not found");
-    }
+    let user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status: 'inactive',  },
+      { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+    );
 
-    let deletedUser = await User.findOneAndDelete({ email: req.params.email });
-    res.send({ deletedUser });
+    res.send({ user });
   } catch (err) {
     next(err);
   }

@@ -10,7 +10,13 @@ const UserSchema = new mongoose.Schema({
     phone: { type: String, required: true },
     role: { type: String, enum: ['admin', 'user', 'instructor', 'member', 'recepcionist'], default: 'user' },
     password: { type: String, required: true },
-    photo: { type: String, default: 'default.jpg' }
+    photo: { type: String, default: 'default.jpg' },
+    status: {
+        type: String,
+        default: 'active',
+        enum: ['active', 'inactive'],
+        required: true
+    },
 });
 
 // Método para generar un JWT (opcional)

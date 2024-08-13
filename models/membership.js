@@ -1,4 +1,3 @@
-// models/Membership.js
 const mongoose = require('mongoose');
 
 const membershipSchema = new mongoose.Schema({
@@ -25,15 +24,20 @@ const membershipSchema = new mongoose.Schema({
     default: 'active',
     enum: ['active', 'inactive']
   },
-  payment:[
+  /*payment: [
     {
-      name:String,
-      amount:Number,
-      method:String,
-      status:String,
-      finishedAt:Date
+      name: String,
+      amount: Number,
+      method: String,
+      status: String,
+      finishedAt: Date
     }
   ],
+  userId: {  
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }*/
 }, {
   timestamps: true
 });
