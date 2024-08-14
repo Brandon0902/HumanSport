@@ -60,12 +60,49 @@ const User = mongoose.model('User');
  *               items:
  *                 $ref: '#/components/schemas/Booking'
  */
+//Obtener todas las reservas
 router.get('/',autentifica, async (req, res) => {
   try {
-    const bookings = await Booking.find({});
+    const bookings = await Booking.find({}).populate(['user', 'course']);
     res.json(bookings);
   } catch (err) {
     res.status(500).send('Error al obtener las reservas');
+  }
+});
+
+//Obtener una reserva por su ID
+router.get('/:id', autentifica, async (req, res, next) => {
+  try {
+    let booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).send('Reserva no encontrado');
+    }
+    res.send(booking);
+  } catch (err) {
+    next(err);
+  }
+});
+
+//Editar Booking por método PUT
+//Edición del objeto entero PUT
+router.put("/:id", autentifica, async (req, res, next) => {
+  try {
+    const { course, comments } = req.body;
+
+    // Actualizar el curso en la base de datos
+    let booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { course, comments },
+      { new: true, runValidators: true }
+    );
+
+    if (!booking) {
+      return res.status(404).send("Reserva no encontrado");
+    }
+
+    res.send(booking);
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -105,24 +142,23 @@ router.get('/',autentifica, async (req, res) => {
  *         description: Error del servidor
  */
 router.post('/', autentifica, [
-  check('user.firstName').notEmpty().withMessage('El nombre del usuario es requerido'),
-  check('user.phone').notEmpty().withMessage('El teléfono del usuario es requerido'),
-  check('courseName').notEmpty().withMessage('El nombre del curso es requerido'),
+  check('user').notEmpty().withMessage('El ID del usuario es requerido'),
+  check('course').notEmpty().withMessage('El ID del curso es requerido'),
 ], async (req, res) => {
 
-  const { user, courseName, comments } = req.body;
+  const { user, course, comments } = req.body;
 
   try {
     // Buscar el usuario por nombre y teléfono
-    const foundUser = await User.findOne({ firstName: user.firstName, phone: user.phone });
+    const foundUser = await User.findById(user);
     if (!foundUser) {
-      return res.status(404).json({ message: `Usuario con nombre ${user.firstName} y teléfono ${user.phone} no encontrado.` });
+      return res.status(404).json({ message: `Usuario no encontrado.` });
     }
 
     // Buscar el curso por nombre
-    const course = await Course.findOne({ name: courseName });
-    if (!course) {
-      return res.status(404).json({ message: `Curso con nombre ${courseName} no encontrado.` });
+    const courseFound = await Course.findById(course);
+    if (!courseFound) {
+      return res.status(404).json({ message: `Curso no encontrado.` });
     }
 
   const errors = validationResult(req);
@@ -133,7 +169,7 @@ router.post('/', autentifica, [
     // Crear el nuevo booking con las referencias al usuario y curso
     const booking = new Booking({
       user: foundUser._id,
-      course: course._id,
+      course: courseFound._id,
       status: 'active',
       comments: comments || ''
     });
@@ -142,6 +178,21 @@ router.post('/', autentifica, [
     res.status(201).json({ message: 'Reserva creada exitosamente', booking: savedBooking });
   } catch (err) {
     res.status(500).json({ message: 'Error al crear la reserva', error: err.toString() });
+  }
+});
+
+//Eliminar reserva por su ID
+router.delete('/delete/:id', autentifica, async (req, res, next) => {
+  try {
+    let booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status: 'inactive',  },
+      { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
+    );
+
+    res.send({ booking });
+  } catch (err) {
+    next(err);
   }
 });
 

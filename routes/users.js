@@ -103,6 +103,11 @@ router.get('/', autentifica, canRegisterUser, async(req, res, next)=> {
     if (role) {
       query.role = role;
     }
+    const status = req.query.status;
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
 
     let users = await User.find(query);
     res.send(users);
@@ -217,7 +222,8 @@ router.post('/', upload.single('photo'), validations, async (req, res, next) => 
       phone: req.body.phone,
       role: req.body.role,
       password: encrypted,
-      photo:  photoPath 
+      photo:  photoPath ,
+      status: 'active'
     });
 
     newUser.setImgUrl(photoPath);

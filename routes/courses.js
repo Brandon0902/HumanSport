@@ -1,14 +1,13 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
-const autentifica = require("../middleware/autentificajwt");  
+const autentifica = require("../middleware/autentificajwt");
 
 const Course = mongoose.model("Course");
-const Instructor = mongoose.model('Instructor');
+const Instructor = mongoose.model("Instructor");
 const User = mongoose.model("User");
 
-const { check, validationResult } = require('express-validator');
-
+const { check, validationResult } = require("express-validator");
 
 /**
  * @swagger
@@ -82,38 +81,46 @@ const { check, validationResult } = require('express-validator');
  *       500:
  *         description: Error al obtener los cursos.
  */
-router.get('/', autentifica, async (req, res) => {
+router.get("/", autentifica, async (req, res) => {
   try {
+      let query = {};
+
+      const status = req.query.status;
+
+      if (status && status !== "all") {
+        query.status = status;
+      }
+
+
     let courses;
 
     // Instructores ven solo los cursos asignados a ellos
-    if (req.user.role === 'instructor') {
+    if (req.user.role === "instructor") {
       // Buscar el usuario logueado por email en la colección de usuarios
       const user = await User.findOne({ email: req.user.email });
       if (!user) {
-        return res.status(404).json({ message: 'Usuario no encontrado.' });
+        return res.status(404).json({ message: "Usuario no encontrado." });
       }
 
       // Usar el nombre del usuario para buscar en la colección de instructores
       const instructor = await Instructor.findOne({ name: user.firstName });
       if (!instructor) {
-        return res.status(404).json({ message: 'Instructor no encontrado.' });
+        return res.status(404).json({ message: "Instructor no encontrado." });
       }
 
       // Buscar cursos asignados al instructor encontrado
-      courses = await Course.find({ instructor: instructor._id });
+      courses = await Course.find({ instructor: instructor._id, ...query });
     } else {
       // Administradores y usuarios ven todos los cursos
-      courses = await Course.find({}).populate('instructor');
+      
+      courses = await Course.find(query).populate("instructor");
     }
 
     res.json(courses);
   } catch (err) {
-    res.status(500).send('Error al obtener los cursos');
+    res.status(500).send("Error al obtener los cursos");
   }
 });
-
-
 
 /**
  * @swagger
@@ -135,45 +142,59 @@ router.get('/', autentifica, async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.post('/', autentifica, [
-  check('name').notEmpty().withMessage('El nombre del curso es requerido'),
-  check('description').notEmpty().withMessage('La descripción del curso es requerida'),
-  check('capacity').isInt({ gt: 0 }).withMessage('La capacidad debe ser un número positivo'),
-], async (req, res) => {
-  //console.log('Role:', req.user.role); 
+router.post(
+  "/",
+  autentifica,
+  [
+    check("name").notEmpty().withMessage("El nombre del curso es requerido"),
+    check("description")
+      .notEmpty()
+      .withMessage("La descripción del curso es requerida"),
+    check("capacity")
+      .isInt({ gt: 0 })
+      .withMessage("La capacidad debe ser un número positivo"),
+  ],
+  async (req, res) => {
+    //console.log('Role:', req.user.role);
 
-  // Verificar si el usuario es administrador
-  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
-    return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
+    // Verificar si el usuario es administrador
+    if (req.user.role !== "admin" && req.user.role !== "recepcionist") {
+      return res
+        .status(403)
+        .send("Acceso denegado no tienes permiso para esta acción");
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const course = new Course({
+      name: req.body.name,
+      description: req.body.description,
+      capacity: req.body.capacity,
+      status: "active",
+      classDay: req.body.classDay.map((classDay) => ({
+        day: classDay.day,
+        time: classDay.time,
+        startDate: classDay.startDate,
+        endDate: classDay.endDate,
+      })),
+      instructor: req.body.instructor,
+    });
+
+    try {
+      const savedCourse = await course.save();
+      res
+        .status(201)
+        .json({ message: "Curso creado exitosamente", course: savedCourse });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: "Error al crear el curso", error: err.toString() });
+    }
   }
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  const course = new Course({
-    name: req.body.name,
-    description: req.body.description,
-    capacity: req.body.capacity,
-    status: 'active',
-    classDay: req.body.classDay.map(classDay => ({
-      day: classDay.day,
-      time: classDay.time,
-      startDate: classDay.startDate,
-      endDate: classDay.endDate
-    })),
-    instructor: req.body.instructor
-  });
-
-  try {
-    const savedCourse = await course.save();
-    res.status(201).json({ message: 'Curso creado exitosamente', course: savedCourse });
-  } catch (err) {
-    res.status(500).json({ message: 'Error al crear el curso', error: err.toString() });
-  }
-});
-
+);
 
 /**
  * @swagger
@@ -204,22 +225,34 @@ router.post('/', autentifica, [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/actualizar/:id', autentifica, async (req, res) => {
+router.patch("/actualizar/:id", autentifica, async (req, res) => {
   const courseId = req.params.id;
 
   // Verificar si el usuario es administrador
-  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
-    return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
+  if (req.user.role !== "admin" && req.user.role !== "recepcionist") {
+    return res
+      .status(403)
+      .send("Acceso denegado no tienes permiso para esta acción");
   }
 
   try {
-    const updatedCourse = await Course.findByIdAndUpdate(courseId, req.body, { new: true, runValidators: true });
+    const updatedCourse = await Course.findByIdAndUpdate(courseId, req.body, {
+      new: true,
+      runValidators: true,
+    });
     if (!updatedCourse) {
-      return res.status(404).json({ message: 'Curso no encontrado' });
+      return res.status(404).json({ message: "Curso no encontrado" });
     }
-    res.status(200).json({ message: 'Curso actualizado exitosamente', course: updatedCourse });
+    res
+      .status(200)
+      .json({
+        message: "Curso actualizado exitosamente",
+        course: updatedCourse,
+      });
   } catch (err) {
-    res.status(500).json({ message: 'Error al actualizar el curso', error: err.toString() });
+    res
+      .status(500)
+      .json({ message: "Error al actualizar el curso", error: err.toString() });
   }
 });
 
@@ -244,31 +277,41 @@ router.patch('/actualizar/:id', autentifica, async (req, res) => {
  *       500:
  *         description: Error del servidor
  */
-router.delete('/delete/:id', autentifica, async (req, res) => {
+router.delete("/delete/:id", autentifica, async (req, res) => {
   const courseId = req.params.id;
 
   // Verificar si el usuario es administrador
-  if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
-    return res.status(403).send('Acceso denegado no tienes permiso para esta acción');
+  if (req.user.role !== "admin" && req.user.role !== "recepcionist") {
+    return res
+      .status(403)
+      .send("Acceso denegado no tienes permiso para esta acción");
   }
 
   try {
-    const deletedCourse = await Course.findByIdAndUpdate(courseId, { status: 'inactive' }, { new: true });
+    const deletedCourse = await Course.findByIdAndUpdate(
+      courseId,
+      { status: "inactive" },
+      { new: true }
+    );
     if (!deletedCourse) {
-      return res.status(404).json({ message: 'Curso no encontrado' });
+      return res.status(404).json({ message: "Curso no encontrado" });
     }
-    res.status(200).json({ message: 'Curso eliminado exitosamente', course: deletedCourse });
+    res
+      .status(200)
+      .json({ message: "Curso eliminado exitosamente", course: deletedCourse });
   } catch (err) {
-    res.status(500).json({ message: 'Error al eliminar el curso', error: err.toString() });
+    res
+      .status(500)
+      .json({ message: "Error al eliminar el curso", error: err.toString() });
   }
 });
 
 // Obtener un curso por ID
-router.get('/:id', autentifica, async (req, res, next) => {
+router.get("/:id", autentifica, async (req, res, next) => {
   try {
     let course = await Course.findById(req.params.id);
     if (!course) {
-      return res.status(404).send('Curso no encontrado');
+      return res.status(404).send("Curso no encontrado");
     }
     res.send(course);
   } catch (err) {
@@ -277,9 +320,9 @@ router.get('/:id', autentifica, async (req, res, next) => {
 });
 
 //Edición del objeto entero PUT
-router.put('/:id', autentifica, async (req,res,next) =>{
+router.put("/:id", autentifica, async (req, res, next) => {
   try {
-    const { name, description, capacity} = req.body;
+    const { name, description, capacity } = req.body;
 
     // Actualizar el curso en la base de datos
     let course = await Course.findByIdAndUpdate(
@@ -289,14 +332,13 @@ router.put('/:id', autentifica, async (req,res,next) =>{
     );
 
     if (!course) {
-      return res.status(404).send('Curso no encontrado');
+      return res.status(404).send("Curso no encontrado");
     }
 
     res.send(course);
   } catch (err) {
     next(err);
   }
-})
-
+});
 
 module.exports = router;

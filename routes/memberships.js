@@ -40,7 +40,15 @@ function isAdmin(req, res, next) {
  */
 router.get('/', async (req, res) => {
   try {
-    const memberships = await Membership.find({});
+    let query = {};
+
+    const status = req.query.status;
+
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    const memberships = await Membership.find(query);
     res.json(memberships);
   } catch (err) {
     res.status(500).send('Error al obtener las membresías');
