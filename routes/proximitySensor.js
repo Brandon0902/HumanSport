@@ -1,50 +1,76 @@
 const express = require('express');
 const router = express.Router();
-const { SerialPort } = require('serialport');
-const { ReadlineParser } = require('@serialport/parser-readline');
+const mongoose = require("mongoose");
 
-const arduinoPort = "COM3";
-const arduinoSerialPort = new SerialPort({ path: arduinoPort, baudRate: 115200 });
-const parser = arduinoSerialPort.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+const Sensor = mongoose.model('Sensor');
 
-let estadoMovimiento = "";
 
-parser.on('data', function(data, err) {
-    if (err) {
-        return console.log(err);
+// POST: Registrar un nuevo sensor
+router.post('/nuevo', async (req, res) => {
+    try {
+        const { name, hora, lectura } = req.body;
+
+        const nuevoSensor = new Sensor({
+            name,
+            hora,
+            lectura
+        });
+
+        const sensorGuardado = await nuevoSensor.save();
+        res.status(201).json(sensorGuardado);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
     }
-    console.log("Valor recibido:", data);
-    estadoMovimiento = data.toString('utf8');
 });
 
-router.get('/', async (req, res) => {
-    res.send({ estadoMovimiento });
+// PUT: Actualizar el valor de un sensor
+router.put('/:id', async (req, res) => {
+    try {
+        const { hora, lectura } = req.body;
+
+        const sensorActualizado = await Sensor.findByIdAndUpdate(
+            req.params.id,
+            { hora, lectura },
+            { new: true, runValidators: true }
+        );
+
+        if (!sensorActualizado) {
+            return res.status(404).json({ message: 'Sensor no encontrado' });
+        }
+
+        res.json(sensorActualizado);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
 });
 
-router.get('/reanudar', async (req, res) => {
-    arduinoSerialPort.resume();
-    res.send({ estadoMovimiento });
+// DELETE: Eliminar un sensor
+router.delete('/eliminar/:id', async (req, res) => {
+    try {
+        const sensorEliminado = await Sensor.findByIdAndDelete(req.params.id);
+
+        if (!sensorEliminado) {
+            return res.status(404).json({ message: 'Sensor no encontrado' });
+        }
+
+        res.json({ message: 'Sensor eliminado exitosamente' });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
 });
 
-router.get('/detener', async (req, res) => {
-    arduinoSerialPort.pause();
-    res.send({ msg: "cerrar" });
-});
+// GET: Obtener el valor de un sensor
+router.get('/:id', async (req, res) => {
+    try {
+        const sensor = await Sensor.findById(req.params.id);
 
-router.post('/', async (req, res) => {
-    var movimiento = new Sensor({
-        fecha: req.body.fecha,
-        hora: req.body.hora,
-        lectura: estadoMovimiento
-    });
+        if (!sensor) {
+            return res.status(404).json({ message: 'Sensor no encontrado' });
+        }
 
-    await movimiento.save();
-    res.status(201).send(movimiento);
-});
-
-arduinoSerialPort.on('error', function(err) {
-    if (err) {
-        return console.log(err);
+        res.json(sensor);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
     }
 });
 

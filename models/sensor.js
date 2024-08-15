@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const SensorSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        require: true,
+    },
     fecha: {
         type: Date,
         required: true,
@@ -13,7 +17,8 @@ const SensorSchema = new mongoose.Schema({
     lectura: {
         type: String,
         required: true,
-        enum: ['Movimiento detectado', 'No se detecta movimiento']
+        enum: ['Alarma activada', 'Alarma desactivada', 'Puerta bloqueada'], 
+        default: 'Alarma activada'
     }
 });
 

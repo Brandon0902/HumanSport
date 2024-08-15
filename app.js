@@ -30,6 +30,7 @@ require("./models/instructor");
 require("./models/course");
 require("./models/membership");
 require("./models/booking");
+require("./models/sensor");
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -37,7 +38,7 @@ var instructorsRouter = require('./routes/instructors');
 var coursesRouter = require('./routes/courses');
 var membershipRouter = require('./routes/memberships');
 var bookingsRouter = require('./routes/bookings');
-//var comandosRouter  = require('./routes/comandosBD');
+var proximitySensorRouter = require('./routes/proximitySensor');
 
 var app = express();
 
@@ -69,6 +70,7 @@ app.use('/instructors', instructorsRouter);
 app.use('/courses', coursesRouter);
 app.use('/memberships', membershipRouter);
 app.use('/bookings', bookingsRouter);
+app.use('/sensor', proximitySensorRouter);
 //app.use('/comandos', comandosRouter);
 
 // Catch 404 and forward to error handler

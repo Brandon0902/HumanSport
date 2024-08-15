@@ -326,7 +326,7 @@ router.post("/login", [
  *       500:
  *         description: Error del servidor
  */
-router.put("/pass", autentifica, isAdmin, [
+router.put("/pass", autentifica, canRegisterUser, [
   body("email").isEmail(),
   body("password").isStrongPassword({minLength:5,
                                    minLowercase:1,
@@ -409,7 +409,7 @@ router.put("/pass", autentifica, isAdmin, [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/update/email', autentifica, isAdmin, [
+router.patch('/update/email', autentifica, canRegisterUser, [
   body("email").isEmail().withMessage("Debe ser un correo electrónico válido"),
   body("firstName").optional().isString().withMessage("Debe ser una cadena de texto"),
   body("lastName").optional().isString().withMessage("Debe ser una cadena de texto"),
@@ -484,7 +484,7 @@ router.patch('/update/email', autentifica, isAdmin, [
  *       500:
  *         description: Error del servidor
  */
-router.delete('/delete/:email', autentifica, isAdmin, async (req, res, next) => {
+router.delete('/delete/:email', autentifica, canRegisterUser, async (req, res, next) => {
   try {
     let user = await User.findOne({ email: req.params.email });
     if (!user) {
