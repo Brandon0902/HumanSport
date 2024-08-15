@@ -15,6 +15,7 @@ let autentifica = require("../middleware/autentificajwt");
 const Payment = mongoose.model('Payment');
 const Membership = mongoose.model('Membership');
 const User = mongoose.model("User");
+const Booking = mongoose.model("Booking");
 
 function isAdmin(req, res, next) {
   if (req.user.role !== 'admin' && req.user.role !== 'recepcionist') {
@@ -111,44 +112,59 @@ router.get('/', autentifica, canRegisterUser, async(req, res, next)=> {
     }
 
     let users = await User.find(query);
-    res.send(users);
+
+    const usersWithMembershipInfo = [];
+
+    for(const u of users) {
+      usersWithMembershipInfo.push(
+        {
+          ...u.toJSON(),
+          ...((u.role === 'member' && u.status === 'active') && {membershipInfo: await getUserMembership(u._id)})
+          
+        }
+      )
+    }
+
+    res.send(usersWithMembershipInfo);
   } catch (err) {
     next(err);
   }
 });
 
+const getUserMembership = async (id) => {
+  let user = await User.findById(id);
+  if (!user) {
+    return {status: false, message: 'Usuario no encontrado'}
+  }
+  const payment = await Payment.findOne({status: 'completed', userId: id}).sort({ updatedAt: -1 });
+
+  if(!payment){
+    return {status: false, message: 'Este miembro no cuenta con una membresía activa'}
+  }
+
+  const membership = await Membership.findById(payment.membershipId);
+  const today = moment();
+  const paymentDate = moment(payment.updatedAt);
+  const daysElapsed = today.diff(paymentDate, 'days');
+
+  const membershipStatus = daysElapsed <= membership.durationDays;
+
+  const remaningDays = membership.durationDays - daysElapsed;
+  const expirationDate = today.add(remaningDays, 'days');
+
+
+  return {
+    status: membershipStatus,
+    message: membershipStatus ? 'Este miembro tiene una membresía activa' : 'Este miembro no cuenta con una membresía activa',
+    ...(membershipStatus && {daysElapsed, remaningDays, expirationDate, membership, payment }),
+  }
+}
+
 //Endpoint para obtener Membresía activa
 router.get('/:id/memberships', autentifica, async(req, res, next)=> {
   try {
-    let user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).send('Usuario no encontrado');
-    }
-    const payment = await Payment.findOne({status: 'completed', userId: req.params.id}).sort({ updatedAt: -1 });
-
-    if(!payment){
-      res.send({status: false, message: 'Este miembro no cuenta con una membresía activa'})
-    }
-
-    const membership = await Membership.findById(payment.membershipId);
-    const today = moment();
-    const paymentDate = moment(payment.updatedAt);
-    const daysElapsed = today.diff(paymentDate, 'days');
-
-    const membershipStatus = daysElapsed <= membership.durationDays;
-
-    const remaningDays = membership.durationDays - daysElapsed;
-    const expirationDate = today.add(remaningDays, 'days');
-
-
-    res.send({
-      status: membershipStatus,
-      message: membershipStatus ? 'Este miembro tiene una membresía activa' : 'Este miembro no cuenta con una membresía activa',
-      ...(membershipStatus && {daysElapsed, remaningDays, expirationDate, membership, payment }),
-    });
-
+    res.send(await getUserMembership(req.params.id));
   } catch (err) {
-    console.log(err);
     next(err);
   }
 });
@@ -160,7 +176,11 @@ router.get('/:id', autentifica, canRegisterUser, async (req, res, next) => {
     if (!user) {
       return res.status(404).send('Usuario no encontrado');
     }
-    res.send(user);
+    let bookings = [];
+    if(user.role === 'member'){
+      bookings = await Booking.find({user: user._id, status: 'active'}).populate('course');
+    }
+    res.send({...user.toJSON(), ...(user.role === 'member' && {bookings})});
   } catch (err) {
     next(err);
   }
