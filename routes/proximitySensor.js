@@ -23,14 +23,15 @@ router.post('/nuevo', async (req, res) => {
     }
 });
 
-// PUT: Actualizar el valor de un sensor
-router.put('/:id', async (req, res) => {
+
+// PATCH: Actualizar solo los campos especificados de un sensor
+router.patch('/:id', async (req, res) => {
     try {
-        const { hora, lectura } = req.body;
+        const actualizaciones = req.body; // Toma solo los campos enviados en el body
 
         const sensorActualizado = await Sensor.findByIdAndUpdate(
             req.params.id,
-            { hora, lectura },
+            actualizaciones,
             { new: true, runValidators: true }
         );
 
@@ -43,6 +44,8 @@ router.put('/:id', async (req, res) => {
         res.status(400).json({ message: error.message });
     }
 });
+
+
 
 // DELETE: Eliminar un sensor
 router.delete('/eliminar/:id', async (req, res) => {
