@@ -31,6 +31,7 @@ require("./models/course");
 require("./models/membership");
 require("./models/booking");
 require("./models/payment");
+require("./models/sensor");
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -38,8 +39,10 @@ var instructorsRouter = require('./routes/instructors');
 var coursesRouter = require('./routes/courses');
 var membershipRouter = require('./routes/memberships');
 var bookingsRouter = require('./routes/bookings');
+
 var paymentsRouter = require('./routes/payments');
 //var comandosRouter  = require('./routes/comandosBD');
+var proximitySensorRouter = require('./routes/proximitySensor');
 
 var app = express();
 
@@ -59,7 +62,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(cors({
-  "origin": ["http://localhost:4200","http://localhost:80"],
+  "origin": ["http://localhost:4200","http://localhost:80", "https://human-sport.vercel.app"],
   "methods": "GET,PUT,POST,DELETE",
   "preflightContinue": false,
   "optionsSuccessStatus": 204
@@ -72,6 +75,7 @@ app.use('/courses', coursesRouter);
 app.use('/memberships', membershipRouter);
 app.use('/bookings', bookingsRouter);
 app.use('/payments', paymentsRouter);
+app.use('/sensor', proximitySensorRouter);
 //app.use('/comandos', comandosRouter);
 
 // Catch 404 and forward to error handler
