@@ -62,7 +62,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(cors({
-  "origin": ["http://localhost:4200","http://localhost:80, https://human-sport.vercel.app"],
+  "origin": ["http://localhost:4200","http://localhost:80", "https://human-sport.vercel.app"],
   "methods": "GET,PUT,POST,DELETE",
   "preflightContinue": false,
   "optionsSuccessStatus": 204
