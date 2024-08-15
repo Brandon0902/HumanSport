@@ -12,7 +12,7 @@ const Payment = mongoose.model("Payment");
 //Obrener la lista de pagos
 router.get("/", autentifica, async (req, res) => {
   try {
-    const payments = await Payment.find({});
+    const payments = await Payment.find({}).populate(['userId', 'membershipId']);
     res.json(payments);
   } catch (err) {
     res.status(500).send("Error al obtener la lista de pagos");

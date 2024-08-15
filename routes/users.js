@@ -12,7 +12,8 @@ const path = require('path');
 
 let autentifica = require("../middleware/autentificajwt");
 
-
+const Payment = mongoose.model('Payment');
+const Membership = mongoose.model('Membership');
 const User = mongoose.model("User");
 
 function isAdmin(req, res, next) {
@@ -112,6 +113,42 @@ router.get('/', autentifica, canRegisterUser, async(req, res, next)=> {
     let users = await User.find(query);
     res.send(users);
   } catch (err) {
+    next(err);
+  }
+});
+
+//Endpoint para obtener Membresía activa
+router.get('/:id/memberships', autentifica, async(req, res, next)=> {
+  try {
+    let user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).send('Usuario no encontrado');
+    }
+    const payment = await Payment.findOne({status: 'completed', userId: req.params.id}).sort({ updatedAt: -1 });
+
+    if(!payment){
+      res.send({status: false, message: 'Este miembro no cuenta con una membresía activa'})
+    }
+
+    const membership = await Membership.findById(payment.membershipId);
+    const today = moment();
+    const paymentDate = moment(payment.updatedAt);
+    const daysElapsed = today.diff(paymentDate, 'days');
+
+    const membershipStatus = daysElapsed <= membership.durationDays;
+
+    const remaningDays = membership.durationDays - daysElapsed;
+    const expirationDate = today.add(remaningDays, 'days');
+
+
+    res.send({
+      status: membershipStatus,
+      message: membershipStatus ? 'Este miembro tiene una membresía activa' : 'Este miembro no cuenta con una membresía activa',
+      ...(membershipStatus && {daysElapsed, remaningDays, expirationDate, membership, payment }),
+    });
+
+  } catch (err) {
+    console.log(err);
     next(err);
   }
 });
