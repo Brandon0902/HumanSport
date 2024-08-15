@@ -146,25 +146,38 @@ router.post('/', autentifica, [
   check('course').notEmpty().withMessage('El ID del curso es requerido'),
 ], async (req, res) => {
 
+  // Primero, valida los errores en la solicitud
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   const { user, course, comments } = req.body;
 
   try {
-    // Buscar el usuario por nombre y teléfono
+    // Buscar el usuario por ID
     const foundUser = await User.findById(user);
     if (!foundUser) {
       return res.status(404).json({ message: `Usuario no encontrado.` });
     }
 
-    // Buscar el curso por nombre
+    // Buscar el curso por ID
     const courseFound = await Course.findById(course);
     if (!courseFound) {
       return res.status(404).json({ message: `Curso no encontrado.` });
     }
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+    // Verificar si el usuario ya tiene una reserva para esta clase
+    const existingBooking = await Booking.findOne({ user: foundUser._id, course: course, status: 'active'});
+    if (existingBooking) {
+      return res.status(400).json({ message: 'Ya tienes una reserva para esta clase.' });
+    }
+
+    // Verificar si la capacidad ya está llena
+    const bookingsCount = await Booking.countDocuments({ course: course });
+    if (bookingsCount >= courseFound.capacity) {
+      return res.status(400).json({ message: 'La capacidad de la clase ya está llena.' });
+    }
 
     // Crear el nuevo booking con las referencias al usuario y curso
     const booking = new Booking({
@@ -174,9 +187,11 @@ router.post('/', autentifica, [
       comments: comments || ''
     });
 
+    // Guardar la reserva y devolver la respuesta
     const savedBooking = await booking.save();
     res.status(201).json({ message: 'Reserva creada exitosamente', booking: savedBooking });
   } catch (err) {
+    // Manejo de errores
     res.status(500).json({ message: 'Error al crear la reserva', error: err.toString() });
   }
 });
