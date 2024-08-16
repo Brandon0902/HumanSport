@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const mongoose = require("mongoose");
 const { check, validationResult } = require('express-validator');
@@ -63,7 +64,17 @@ const User = mongoose.model('User');
 //Obtener todas las reservas
 router.get('/',autentifica, async (req, res) => {
   try {
-    const bookings = await Booking.find({}).populate(['user', 'course']);
+    const token = req.header("Authorization").replace("Bearer ", "");
+    const decoded = jwt.decode(token); 
+
+
+    let filter = {}
+
+    if(decoded.role === 'member'){
+      filter = {user: decoded.id}
+    }
+
+    const bookings = await Booking.find(filter).populate(['user', 'course']);
     res.json(bookings);
   } catch (err) {
     res.status(500).send('Error al obtener las reservas');

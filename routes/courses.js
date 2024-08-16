@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const autentifica = require("../middleware/autentificajwt");
+const jwt = require("jsonwebtoken");
+const {  ObjectId } = require('mongodb');
+
 
 const Course = mongoose.model("Course");
 const Instructor = mongoose.model("Instructor");
@@ -83,41 +86,31 @@ const { check, validationResult } = require("express-validator");
  */
 router.get("/", autentifica, async (req, res) => {
   try {
-      let query = {};
+    let query = {};
 
-      const status = req.query.status;
+    const status = req.query.status;
 
-      if (status && status !== "all") {
-        query.status = status;
-      }
-
+    if (status && status !== "all") {
+      query.status = status;
+    }
 
     let courses;
 
     // Instructores ven solo los cursos asignados a ellos
-    if (req.user.role === "instructor") {
-      // Buscar el usuario logueado por email en la colección de usuarios
-      const user = await User.findOne({ email: req.user.email });
-      if (!user) {
-        return res.status(404).json({ message: "Usuario no encontrado." });
-      }
+    const token = req.header("Authorization").replace("Bearer ", "");
+    const decoded = jwt.decode(token);
 
-      // Usar el nombre del usuario para buscar en la colección de instructores
-      const instructor = await Instructor.findOne({ name: user.firstName });
-      if (!instructor) {
-        return res.status(404).json({ message: "Instructor no encontrado." });
-      }
-
-      // Buscar cursos asignados al instructor encontrado
-      courses = await Course.find({ instructor: instructor._id, ...query });
-    } else {
-      // Administradores y usuarios ven todos los cursos
+    if (decoded.role === "instructor") {
+      query.instructor = decoded.id;
       
-      courses = await Course.find(query).populate("instructor");
     }
+
+    // Administradores y usuarios ven todos los cursos
+    courses = await Course.find(query).populate("instructor");
 
     res.json(courses);
   } catch (err) {
+    console.log(err);
     res.status(500).send("Error al obtener los cursos");
   }
 });
@@ -243,12 +236,10 @@ router.patch("/actualizar/:id", autentifica, async (req, res) => {
     if (!updatedCourse) {
       return res.status(404).json({ message: "Curso no encontrado" });
     }
-    res
-      .status(200)
-      .json({
-        message: "Curso actualizado exitosamente",
-        course: updatedCourse,
-      });
+    res.status(200).json({
+      message: "Curso actualizado exitosamente",
+      course: updatedCourse,
+    });
   } catch (err) {
     res
       .status(500)
