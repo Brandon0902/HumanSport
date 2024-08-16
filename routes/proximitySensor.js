@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require("mongoose");
+const autentifica = require("../middleware/autentificajwt"); // Asegúrate de tener este middleware configurado
 
 const Sensor = mongoose.model('Sensor');
 
-
-// POST: Registrar un nuevo sensor
-router.post('/nuevo', async (req, res) => {
+// POST: Registrar un nuevo sensor (abierto a todos los usuarios autenticados)
+router.post('/nuevo', autentifica, async (req, res) => {
     try {
         const { name, hora, lectura } = req.body;
 
@@ -23,9 +23,13 @@ router.post('/nuevo', async (req, res) => {
     }
 });
 
+// PATCH: Actualizar solo los campos especificados de un sensor (solo admin y recepcionist)
+router.patch('/:id', autentifica, async (req, res) => {
+    // Verificar si el usuario es administrador o recepcionist
+    if (req.user.role !== "admin" && req.user.role !== "recepcionist") {
+        return res.status(403).send("Acceso denegado. No tienes permiso para esta acción");
+    }
 
-// PATCH: Actualizar solo los campos especificados de un sensor
-router.patch('/:id', async (req, res) => {
     try {
         const actualizaciones = req.body; // Toma solo los campos enviados en el body
 
@@ -45,10 +49,13 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
+// DELETE: Eliminar un sensor (solo admin y recepcionist)
+router.delete('/eliminar/:id', autentifica, async (req, res) => {
+    // Verificar si el usuario es administrador o recepcionist
+    if (req.user.role !== "admin" && req.user.role !== "recepcionist") {
+        return res.status(403).send("Acceso denegado. No tienes permiso para esta acción");
+    }
 
-
-// DELETE: Eliminar un sensor
-router.delete('/eliminar/:id', async (req, res) => {
     try {
         const sensorEliminado = await Sensor.findByIdAndDelete(req.params.id);
 
@@ -62,7 +69,7 @@ router.delete('/eliminar/:id', async (req, res) => {
     }
 });
 
-// GET: Obtener el valor de un sensor
+// GET: Obtener el valor de un sensor (abierto a todos los usuarios autenticados)
 router.get('/:id', async (req, res) => {
     try {
         const sensor = await Sensor.findById(req.params.id);
