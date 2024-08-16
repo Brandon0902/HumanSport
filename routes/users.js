@@ -97,7 +97,7 @@ const validations = [
  *       500:
  *         description: Error del servidor
  */
-router.get('/', autentifica, canRegisterUser, async(req, res, next)=> {
+router.get('/', autentifica, async(req, res, next)=> {
   try {
     const role = req.query.role;
     let query = {};
@@ -170,7 +170,7 @@ router.get('/:id/memberships', autentifica, async(req, res, next)=> {
 });
 
 // Obtener un usuario por ID
-router.get('/:id', autentifica, canRegisterUser, async (req, res, next) => {
+router.get('/:id', autentifica, async (req, res, next) => {
   try {
     let user = await User.findById(req.params.id);
     if (!user) {
@@ -187,20 +187,31 @@ router.get('/:id', autentifica, canRegisterUser, async (req, res, next) => {
 });
 
 //Edición del objeto entero PUT
-router.put('/:id', autentifica, canRegisterUser, async (req,res,next) =>{
+router.put('/:id', upload.single('photo'), autentifica, async (req,res,next) =>{
   try {
     const { firstName, lastName, email, phone } = req.body;
+
+    let photoPath = '';
+
+    if(req.file){
+      photoPath =  `/photo/${req.file.filename}`
+    }
+
+    console.log(photoPath)
 
     // Actualizar el usuario en la base de datos
     let user = await User.findByIdAndUpdate(
       req.params.id,
-      { firstName, lastName, email, phone },
+      { firstName, lastName, email, phone, ...(photoPath && {photo: photoPath}) },
       { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
     );
 
     if (!user) {
       return res.status(404).send('Usuario no encontrado');
     }
+
+    user.setImgUrl(photoPath);
+    user.save();
 
     res.send(user);
   } catch (err) {
@@ -266,7 +277,7 @@ router.post('/', upload.single('photo'), validations, async (req, res, next) => 
       return res.status(400).json({ errors: errors.array() });
     }
 
-    let photoPath = req.file? `/photo/${req.file.filename}` : 'default.jpg'; 
+    let photoPath = req.file? `/photo/${req.file.filename}` : '/default.jpg'; 
 
     salt = await bcrypt.genSalt(10);
     encrypted = await bcrypt.hash(req.body.password, salt);
