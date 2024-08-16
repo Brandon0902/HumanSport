@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 
-
 const UserSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
@@ -11,15 +10,9 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, enum: ['admin', 'user', 'instructor', 'member', 'recepcionist'], default: 'user' },
     password: { type: String, required: true },
     photo: { type: String, default: 'default.jpg' },
-    status: {
-        type: String,
-        default: 'active',
-        enum: ['active', 'inactive'],
-        required: true
-    },
+    status: { type: String, default: 'active', enum: ['active', 'inactive'], required: true },
 });
 
-// Método para generar un JWT (opcional)
 UserSchema.methods.generateJWT = function() {
     return jwt.sign(
         {
@@ -32,9 +25,9 @@ UserSchema.methods.generateJWT = function() {
     );
 };
 
-UserSchema.methods.setImgUrl = function setimgurl(photo){
-    this.photo = "http://localhost:3000" + photo;
-}
+UserSchema.methods.setImgUrl = function setImgUrl(photoKey) {
+    this.photo = `https://human-sport.s3.us-east-2.amazonaws.com/${photoKey}`;
+};
 
 const User = mongoose.model("User", UserSchema);
 

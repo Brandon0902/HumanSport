@@ -4,11 +4,15 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const { body, validationResult } = require("express-validator");
 const moment = require('moment');
-const upload = require ('../libs/container');
-const validator = require('validator');
-const fs = require('fs-extra');
-const path = require('path');
-
+const upload = require('../libs/container');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+});
 
 let autentifica = require("../middleware/autentificajwt");
 
@@ -187,38 +191,89 @@ router.get('/:id', autentifica, async (req, res, next) => {
 });
 
 //Edición del objeto entero PUT
-router.put('/:id', upload.single('photo'), autentifica, async (req,res,next) =>{
+router.put('/:id', upload.single('photo'), autentifica, async (req, res, next) => {
   try {
     const { firstName, lastName, email, phone } = req.body;
 
-    let photoPath = '';
-
-    if(req.file){
-      photoPath =  `/photo/${req.file.filename}`
-    }
-
-    console.log(photoPath)
-
-    // Actualizar el usuario en la base de datos
-    let user = await User.findByIdAndUpdate(
-      req.params.id,
-      { firstName, lastName, email, phone, ...(photoPath && {photo: photoPath}) },
-      { new: true, runValidators: true } // new: true devuelve el documento modificado, runValidators aplica las validaciones del esquema
-    );
-
+    // Busca al usuario por ID
+    let user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).send('Usuario no encontrado');
     }
 
-    user.setImgUrl(photoPath);
-    user.save();
+    // Actualiza los campos del usuario
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
 
+    // Si se subió una nueva foto, actualiza el campo `photo`
+    if (req.file && req.file.key) {
+      const photoKey = req.file.key;
+      user.setImgUrl(photoKey);  // Actualiza la URL de la imagen en S3
+    }
+
+    // Guarda los cambios en la base de datos
+    await user.save();
+
+    // Devuelve el usuario actualizado
     res.send(user);
   } catch (err) {
     next(err);
   }
-})
+});
 
+/**
+ * @swagger
+ * /users:
+ *   post:
+ *     summary: Crear un nuevo usuario
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Juan
+ *               lastName:
+ *                 type: string
+ *                 example: Pérez
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: juan.perez@example.com
+ *               birthdate:
+ *                 type: string
+ *                 format: date
+ *                 example: 15 de agosto de 1990
+ *               phone:
+ *                 type: string
+ *                 example: 123456789
+ *               role:
+ *                 type: string
+ *                 example: user
+ *               password:
+ *                 type: string
+ *                 example: $2b$10$kU8G4q9qVw7C2d7pAe8HPO5.CGzVfnXyJfoOpEAhE/f60PqTtG1G6
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Usuario creado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Error de validación
+ *       500:
+ *         description: Error del servidor
+ */
 /**
  * @swagger
  * /users:
@@ -277,10 +332,8 @@ router.post('/', upload.single('photo'), validations, async (req, res, next) => 
       return res.status(400).json({ errors: errors.array() });
     }
 
-    let photoPath = req.file? `/photo/${req.file.filename}` : '/default.jpg'; 
-
-    salt = await bcrypt.genSalt(10);
-    encrypted = await bcrypt.hash(req.body.password, salt);
+    const salt = await bcrypt.genSalt(10);
+    const encryptedPassword = await bcrypt.hash(req.body.password, salt);
 
     let newUser = new User({
       firstName: req.body.firstName,
@@ -289,19 +342,28 @@ router.post('/', upload.single('photo'), validations, async (req, res, next) => 
       birthdate: req.body.birthdate,
       phone: req.body.phone,
       role: req.body.role,
-      password: encrypted,
-      photo:  photoPath ,
+      password: encryptedPassword,
+      photo: 'default.jpg', // Inicializa con una foto por defecto
       status: 'active'
     });
 
-    newUser.setImgUrl(photoPath);
+    // Si se subió una nueva foto, actualiza el campo `photo`
+    if (req.file && req.file.key) {
+      const photoKey = req.file.key;
+      newUser.setImgUrl(photoKey);  // Actualiza la URL de la imagen en S3
+    }
 
+    // Guarda el nuevo usuario en la base de datos
     await newUser.save();
+
+    // Devuelve el usuario creado
     res.status(201).send({ newUser });
   } catch (err) {
     next(err);
   }
 });
+
+
 
 /**
  * @swagger
@@ -490,52 +552,84 @@ router.put("/pass", autentifica, canRegisterUser, [
  *       500:
  *         description: Error del servidor
  */
-router.patch('/update/email', autentifica, canRegisterUser, [
-  body("email").isEmail().withMessage("Debe ser un correo electrónico válido"),
-  body("firstName").optional().isString().withMessage("Debe ser una cadena de texto"),
-  body("lastName").optional().isString().withMessage("Debe ser una cadena de texto"),
-  body("birthdate").optional().custom((value, { req }) => {
-    const transformedDate = moment(value, "D de MMMM", true).format();
-    if (!transformedDate) {
-      return "La fecha de nacimiento es inválida";
-    }
-    req.body.birthdate = transformedDate;
-    return true;
-  }),
-  body("phone").optional().isString().withMessage("Debe ser una cadena de texto"),
-  body("role").optional().isString().withMessage("Debe ser una cadena de texto"),
-  body("photo").optional().isString().withMessage("Debe ser una cadena de texto")
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
+/**
+ * @swagger
+ * /users/{id}:
+ *   put:
+ *     summary: Actualizar un usuario existente
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: 60d21b4667d0d8992e610c85
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Juan
+ *               lastName:
+ *                 type: string
+ *                 example: Pérez
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: juan.perez@example.com
+ *               phone:
+ *                 type: string
+ *                 example: 123456789
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Usuario actualizado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Error de validación
+ *       404:
+ *         description: Usuario no encontrado
+ *       500:
+ *         description: Error del servidor
+ */
+router.put('/:id', upload.single('photo'), autentifica, async (req, res, next) => {
   try {
-    let user = await User.findOne({ email: req.body.email });
-    if (!user) {
-      return res.status(404).send("Usuario no encontrado");
-    }
+      const { firstName, lastName, email, phone } = req.body;
 
-    // Actualizar solo los campos que han sido enviados en la solicitud
-    const updatedFields = {};
-    Object.keys(req.body).forEach(key => {
-      if (key!== 'email') { // Excluir el campo email ya que se usa para buscar
-        updatedFields[key] = req.body[key];
+      // Busca al usuario por ID
+      let user = await User.findById(req.params.id);
+      if (!user) {
+          return res.status(404).send('Usuario no encontrado');
       }
-    });
 
-    // Aplicar los cambios solo a los campos actualizados
-    const updatedUser = await User.findOneAndUpdate(
-      { email: req.body.email },
-      { $set: updatedFields },
-      { new: true }
-    );
+      // Actualiza los campos del usuario
+      if (firstName) user.firstName = firstName;
+      if (lastName) user.lastName = lastName;
+      if (email) user.email = email;
+      if (phone) user.phone = phone;
 
-    res.send({ updatedUser });
+      // Si se subió una nueva foto, actualiza el campo `photo`
+      if (req.file) {
+          user.setImgUrl(req.file.key);  // Actualiza la URL de la imagen en S3
+      }
+
+      // Guarda los cambios en la base de datos
+      await user.save();
+
+      // Devuelve el usuario actualizado
+      res.send(user);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Error del servidor');
+      next(err);
   }
 });
 
